@@ -1,0 +1,336 @@
+1、自我介绍
+2、项目内容介绍
+重点说清楚超卖如何处理的
+update frozen=frozen+purchase_count where id=xxx and (stock-frozen) >= count
+此处介绍不够好，应该：
+1）超卖怎么产生，分析出并发场景下，多线程如何交互操作会引起超卖
+2）增加了一个frozen怎么样就避免了超卖
+事实上，增加frozen只是为了前端展示的合理性，在用户支付的间歇期间，保证用户前端的展现的合理性
+
+3、mongodb与mysql的性能测试对比分析，使用场景对比分析
+ https://blog.csdn.net/Nero_G/article/details/52872070
+4、redis
+1）如何实现分布式锁，
+setnx具体如何用就能实现锁，若中间发生了异常如何解锁
+zookeeper实现分布式锁 createZNode
+也可以基于数据库字段实现分布式锁
+2）redisson用到了lua脚本，自己有没有写过lua脚本
+3）设置超时时间，setnx本身可以设置超时时间，也可以单独对key设置超时时间
+纠正: setnx key value格式，本身不能设置超时时间，需要单独命令设置
+expire key nSeconds
+pexpire key nMilliseconds
+pexpire可设置的更精确
+ttl key 查看key的过期秒数
+pttl key 查看key的过期毫秒数
+4）集群方式
+sentinel+主备，不方便扩容，运维简单
+cluster方式，一致性hash，方便扩容，负载均衡
+集群方式下为什么不能用channel: 
+因为消息不是分片处理的，每一个publish的消息都会广播到所有cluster的各个节点，当消息量大时会形成广播风暴，消耗代码，导致集群的整体吞吐量随着集群节点数的增加了极速下降
+subscribe 订阅
+psubscrible 基于模式的订阅
+5、SpringCloud
+简单的SOA就可以完成需求
+当初选择SpringCloud的原因：
+1）微服务概念特别火，作为技术人员有新技术情结，所以想要使用
+2）当时有dubbo和springcloud，dubbo那个时候已经停止更新将近5年，停更很久了，所以也没有多想，就选择了springcloud
+Hystrix的熔断原理，怎么触发熔断，又怎么开启尝试
+两者不能直接进行对比，dubbo只是作为服务治理的rpc层，而Spring Cloud 提供了一整套分布式服务开发的工具，从边缘服务的Zuul，到服务发现Eureka ，再到hystrix 熔断机制，是一套完整的生态，但是我觉得这里面最有帮助的可能是hystrix ，它提供了完整的熔断机制，可以很轻易的引入现有系统。
+6、Unsafe类型的CAS操作
+不推荐使用，一般要结合if或while循环，技巧性比较强不是特别容易掌握，对程序员的心智要求高
+Unsafe.compareAndSwapInt/Long。。。
+如果真要用，可以用Atomicxxx有关的类
+7、Hashmap的存储（JDK1.7）
+底层就是array数组，每个数据节点是一个Node类型，
+在put时，会hash(key)&n-1进行定位，如果出现了hash碰撞通过拉链法进行扩展，如果碰撞厉害的话会引起查询效率低 JDK1.8对拉链法进行了优化，引入了红黑树，失效效率O(logN)
+8、JDK1.8新增的锁
+StampedLock
+9、看过哪些书
+讲了很多之前看到的经典书籍
+
+1、自我介绍
+2、项目介绍，并穿插讲解其中用到的有关技术
+3、SpringCloud
+1）用到了哪些组件，划分了多少个服务
+2）zuul如何配置路由转发的，内置的filter有哪些，filter类型有哪些
+3）Hystrix的策略，fallback调用时机
+4）oauth2.0的详细过程
+4、Redis
+1）谈一下redis事务 multi,各类命令,watch,exec
+语法错误会终止执行，但是操作的值类型错误，在命令排队期间不会被发现，导致出错前命令生效
+2）redis还怎么用
+分布式锁，具体是如何用的
+try {
+// 使用时用tryLock, 保持3~5秒，等待10s
+// 有些场景不会用这种方式，会直接返回（fail fast，及时告知用户发生了什么情况，让前端应用重试）
+} finally {
+// 在这个里面释放锁
+}
+我回答的是：具体底层是使用 setnx，如果key不存在则设置成功，即认为获得锁；若存在，则认为设置失败，获锁失败
+后来查阅资料，redisson内部使用lua脚本保持了原子性，未使用setnx命令
+
+redisson实现的锁，如何实现可重入
+我的回答是：redisson本身应该是有重入机制，但是毕竟没有使用过，就不做假设
+如果我自己实现，可以通过增加一个计数器，结合当前锁是否被当前线程持有进行增加，在unlock是进行减少，计数器应该放在redis中，保证分布式机器都能操作到（后来又补充用volatile变量或atomicinteger，这个是单机上变量，不合适），可以参照Semaphare的源码实现来处理（应该参照ReentrantLock来实现，事实上Redisson的可重入特性就是类似ReentrantLock）
+后查阅资料，redisson的RLock本身就具有可重入特性
+https://www.cnblogs.com/ASPNET2008/p/6385249.html
+
+redis中保存了哪些数据：
+列表，分布式系统共享的经常要访问的常量等
+
+redis的慢日志查看
+
+5、JVM有关内容
+1）FULL GC触发的条件有哪些
+2）static变量放在哪个内存区(JDK1.7早前版本可能放在方法区，后来放在堆中）
+stack上内存会引起哪些gc，direct buffer上会引起哪些gc，方法区的回收会引起什么gc
+3）GC的类型有哪些
+6、JDK队列有哪些
+LinkList、Deque、PriorityQueue、BlockingQueue、ConcurrentLinkQueue
+TransferQueue、SynchronousQueue(Exectors.newCacheThreadPoll用地方队列，内部不存任何element)、LinkedBlockingQueue、ArrayBlockingQueue
+7、多线程
+线程间通信的方式有哪些：Exchange、volatile、加锁或其它同步方式的共享比例、Atomicxxxx、线程安全的Queue、MQ
+8、kafka
+结构：生产者、消费者、Broker  
+partition的offset的保存或提交方式：zookeeper，主服务器进行保存
+新消费组从哪里offset开始消费：auto.offset.reset=latest或earliest  
+如果是earliest那么新消费组中消费者从头开始消费，必须在新消费组加入前设置，加入后即使不消费也将从新消息消费，不会再从头开始消费
+9、zookeeper
+节点类型：持久有序、持久无序、临时有序、临时无序
+节点角色：leader、follower（参与leader选举）、observer（不参与选举，只监听最终结果）
+https://blog.csdn.net/yu757371316/article/details/80742223
+https://blog.csdn.net/u010775025/article/details/79206893
+10、常用的关系型数据库 MySQL
+explain 执行计划中的一些信息
+
+1、自我介绍
+2、项目介绍，并穿插讲解其中用到的有关技术
+3、SpringCloud
+1）用到了哪些组件，划分了多少个服务
+2）zuul如何配置路由转发的，内置的filter有哪些，filter类型有哪些
+3）Hystrix的策略，fallback调用时机
+4）oauth2.0的详细过程
+4、Redis
+1）谈一下redis事务 multi,各类命令,watch,exec
+语法错误会终止执行，但是操作的值类型错误，在命令排队期间不会被发现，导致出错前命令生效
+2）redis还怎么用
+分布式锁，具体是如何用的
+try {
+// 使用时用tryLock, 保持3~5秒，等待10s
+// 有些场景不会用这种方式，会直接返回（fail fast，及时告知用户发生了什么情况，让前端应用重试）
+} finally {
+// 在这个里面释放锁
+}
+我回答的是：具体底层是使用 setnx，如果key不存在则设置成功，即认为获得锁；若存在，则认为设置失败，获锁失败
+后来查阅资料，redisson内部使用lua脚本保持了原子性，未使用setnx命令
+
+redisson实现的锁，如何实现可重入
+我的回答是：redisson本身应该是有重入机制，但是毕竟没有使用过，就不做假设
+如果我自己实现，可以通过增加一个计数器，结合当前锁是否被当前线程持有进行增加，在unlock是进行减少，计数器应该放在redis中，保证分布式机器都能操作到（后来又补充用volatile变量或atomicinteger，这个是单机上变量，不合适），可以参照Semaphare的源码实现来处理（应该参照ReentrantLock来实现，事实上Redisson的可重入特性就是类似ReentrantLock）
+后查阅资料，redisson的RLock本身就具有可重入特性
+https://www.cnblogs.com/ASPNET2008/p/6385249.html
+
+redis中保存了哪些数据：
+列表，分布式系统共享的经常要访问的常量等
+
+redis的慢日志查看
+
+5、JVM有关内容
+1）FULL GC触发的条件有哪些
+2）static变量放在哪个内存区(JDK1.7早前版本可能放在方法区，后来放在堆中）
+stack上内存会引起哪些gc，direct buffer上会引起哪些gc，方法区的回收会引起什么gc
+3）GC的类型有哪些
+6、JDK队列有哪些
+LinkList、Deque、PriorityQueue、BlockingQueue、ConcurrentLinkQueue
+TransferQueue、SynchronousQueue(Exectors.newCacheThreadPoll用地方队列，内部不存任何element)、LinkedBlockingQueue、ArrayBlockingQueue
+7、多线程
+线程间通信的方式有哪些：Exchange、volatile、加锁或其它同步方式的共享比例、Atomicxxxx、线程安全的Queue、MQ
+8、kafka
+结构：生产者、消费者、Broker  
+partition的offset的保存或提交方式：zookeeper，主服务器进行保存
+新消费组从哪里offset开始消费：auto.offset.reset=latest或earliest  
+如果是earliest那么新消费组中消费者从头开始消费，必须在新消费组加入前设置，加入后即使不消费也将从新消息消费，不会再从头开始消费
+9、zookeeper
+节点类型：持久有序、持久无序、临时有序、临时无序
+节点角色：leader、follower（参与leader选举）、observer（不参与选举，只监听最终结果）
+https://blog.csdn.net/yu757371316/article/details/80742223
+https://blog.csdn.net/u010775025/article/details/79206893
+10、常用的关系型数据库 MySQL
+explain 执行计划中的一些信息
+
+
+周灵敏  14:09:40
+面试记录
+1、自我介绍
+2、最近的项目 从功能、技术及角色
+3、Mongodb与MySQL性能比较
+4、Innodb buffer pool的默认值
+5、SpringCloud的各个组件名称，要说全
+6、服务发现     Eureka与Zk的区别
+可以从CAP角度进行分析   
+ZK: 符合CP，强一致性，也就是可能zk集群有时可能不可用
+之所以设计成CP，因为ZK还保存着集群各服务实例共享的配置和状态信息，这些信息需要强一致性。核心算法Zab，解决数据在分布式环境下一致性。
+作为分布式协同，如leader选举，比较合适，当作为服务注册不太好。
+当我们查询服务列表时，我们可以容忍注册中心返回的是几分钟以前的注册信息，但不能接受服务直接down掉不可用。也就是说，服务注册功能对可用性的要求高于一致性。
+ZK会出现，当master因网络故障失去与其它节点联系时，剩余节点会重新进行leader选举。问题在于，选举leader的时间太长，30~120s，且选举期间整个ZK集群不可用，这就导致在选举期间注册服务瘫痪。
+在云环境下，ZK失去master的概率比较大，在故障恢复过程中的选举阶段，长时间导致服务注册功能不可用。
+
+Eureka：符合AP，不强调C
+Eureka强调AP，各个节点都是平等的，几个节点挂掉不会影响正常节点的工作，剩余节点依然可以提供注册和查询服务。
+Eureka客户端向Eureka Server注册时，如果发现连接失败，则会自动切换至其他节点，只要有一台Eureka在，就能保证注册服务可用，只不过查询到的信息不一定最新最全的。
+另外，Eureka还有自我保护机制，15分钟内超过85%节点都没有心跳，任务Eureka客户端与Server之间出现了网络问题，此时Eureka Server处理机制：
+1）Eureka不再从注册列表中移除因长时间没心跳而应该过期的服务
+2）Eureka Server依然能够接受新服务注册和查询请求，但不会被同步到其它节点上
+3）当网络稳定时，实例的新的注册信息会被同步到其它节点中
+因此Eureka可以很好的应对因网络故障导致部分节点失联的情况，不会像Zookeeper那样使整个注册服务瘫痪
+
+另外，Eureka Client端还有缓存。
+
+Eureka基于Servlet实现，极限性能肯定会受到影响
+
+7、volatile关键字的用处
+1）可见性
+2）防止重排序
+
+8、线程安全容器  JDK1.7 hashmap与concurrenthashmap
+concurrenthashmap的初始化安全性及 put/remove与get的安全性
+hashmap扩容时引起的环形链表（JDK1.7）的过程
+
+9、ReentrantLock与Synchronized性能对比
+
+10、Innodb 隔离级别
+脏读
+不可重复读
+幻读
+如何通过锁来解决
+
+11、应用数据的一致性、幂等性
+生成订单、扣库存、支付、发通知过程中出现异常，如何保证一致性
+
+12、缓存击穿的处理
+
+13、Netty了不了解
+
+14、初试面试官的评价：
+如果作为架构师，整体思维，解决方案缺失，细节处理的不好
+
+
+
+1、自我介绍
+2、项目介绍
+1）业务形态
+2）流量流转及为什么选择一些组件
+3、新老系统对比
+使用了SpringCloud的好处
+4、Spring Ioc Bean的生命周期
+5、Spring中涉及到涉及模式
+访问者模式（调整Bean Definition）、观察者模式、工程模式、单例模型、AOP代理模式等等
+自己在代码中用到的模式:
+1）分红总额计算的方法，根据版本号不同，选择不同的计算逻辑
+原因是为了兼容新老版本切换，同时对拍品的结果判断处理是相同的，只是新版本溢价算的是起拍价乘以分红系数，老版本是成交价减去起拍价，只有弃拍、成功拍卖的情况才会参与溢价计算
+2）支付业务
+有缴纳保证金、有支付尾款、有购买合伙、有充值提现，等操作余额有关的动作，都想要做一些共同校验，钱够不够，加锁防止并发处理，打印处理前后的日志，判重等，只有具体场景相关的逻辑要有调整，通过实现抽象方法来处理具体场景逻辑
+6、STI是什么，与API对应
+应该是听错了，应该是SPI 
+https://www.jianshu.com/p/7e85b8ed00e2
+API：相当于实现方告诉调用方，我的接口提供什么功能
+SPI：相当于调用方告诉各类厂家实现方，要按照我的规范来实现功能，根据我的输入要求产生我要求的输出，具体实现方式有实现厂家自行决定
+7、分布式锁的实现方式
+1）Redis: setnx + redisson
+2）zookeeper createZNode
+8、JDK中锁用过哪些，比较一下
+Lock锁，基于AQS，AQS是典型的模板模式，通过同步队列和等待队列上的操作实现了相应的获取及释放锁的逻辑，但是什么条件下能获取到和怎么样实现释放的逻辑，通过tryAcquire&tryRelease，tryAcquireShared&tryReleaseShared抽象方法进行处理，由子类实现
+优势：非结构化锁、tryLock非阻塞锁、定时锁、lockInterruptibly(可中断锁)、读写锁、多个condition条件
+Synchronized 优势：
+简单直观、方便死锁分析（dump线程栈时可以看清楚具体哪一个锁）、jvm内部编译器可实现优化（锁消除、锁初化）
+
+
+1、自我简历介绍，从毕业到现在各个情况介绍
+顺带介绍了目前在做的项目情况及用到一些技术
+2、对于到杭州工作有没有问题
+说明了一下为什么选择去杭州，会不会有什么顾虑等
+3、工作经历及离职原因（因为中间出现了多次跳槽）
+4、技术相关
+1）通信相关
+NIO：
+我解释了Tomcat和Netty的网络NIO模型
+JDK NIO类库中DirectByteBuffer类的处理机制？MappedByteBuffer去读写1GB文件，在内存中会使用多少内存？
+2）Tcp拆包和粘包
+拆包和粘包产生的原因，Netty如何处理拆包和粘包
+3）JDK1.8 fork/join原理或如何使用
+4）Thread类中isInterruptted和interruptted区别，哪一个是static的方法
+5）ThreadPollExecutor中任务队列，ArrayBlockiingQueue和LinkedBlockingQueue那个效率更高，以及它们的区别
+6）JVM G1 GC算法详述
+7）RPC 没有用过，用的是SpringCloud restful的http格式
+SpringCloud与Istio的区别
+Istio之前有看到，但是一直没有深入了解，在新技术出现很多地方推广时，一定要了解一下，否则很容易在面试时碰到
+Istio是Service Mesh的一种实现方案，采用sidecar，边车模式，即本地代理模式实现微服务的服务发现、负载均衡等，对应用透明，也就是业务侵入性更低
+8）还使用到了哪些技术
+redis,kafka
+秒杀场景，未使用到redis，需要再看一下钟华的基于redis实现的秒杀
+分布式锁 reids.setnx，redisson lua，zookeeper createZNode
+9）缓存雪崩
+缓存穿透（缓存与db都不存在的key，应用层过滤，bloom filer过滤，设置key对应值为null且设定过期时间10s避免攻击流量进入到数据库层面）
+缓存击穿（某个key失效导致直接访问数据库，通过本地锁实现单线程去访问数据库，其它线程进行降级处理）
+缓存雪崩（大面积key失效或者机器重启导致的key大面积失效，导致大量访问冲击数据库引起其他功能因数据库问题异常）
+我把这三者弄混了
+10）kafka的生产者或者消费者模式（消息发送模式？）
+消费者：High level和Low level API  不了解，当时心里猜测是一个是高一级封装的接口，另外一个是低级API，更具灵活性同时要处理一些high level已经处理的问题，类似编程语言，汇编和各类高级程序语言
+https://blog.csdn.net/yjgithub/article/details/78559094
+11）RocketMQ集群模式
+单master，多master，多master/slave异步复制，多master/slave同步双写
+12）kafka与RocketMQ副本的粒度
+Kafka: 基于分区进行复制
+RocketMQ: 不同集群模式的高可用方式不同，有的基于RAID10磁盘进行保证，有的基于MASTER/SLAVE的同步或异步方式进行复制
+13）kafka有没有事务消息？0.11版本之前没有，0.11版本开始有事务消息，可以实现exactly once的投递
+14）SpringBoot需不需要容器？SpringBoot不需要容器，内嵌了容器，也可以打成war进行独立部署
+15）用过哪些工具 visio，markdown, doc, swagger, 禅道，jenkins之类的
+16）如何设计高可用框架？
+此处内容总结的比较少，回答的内容主要集中在后端如何处理，应该从架构师角度，从各个环节进行考虑，前端应用、缓存、双机房等等
+
+
+
+springcloud优点 springcloud对比dubbo
+如何写一个springboot starter
+feign和hytrix如何集成
+zuul有哪些作用  为什么要用zuul
+zuul和nginx对比
+eureka和zookeeper对比 eureka保护机制
+ribbon hytrix超时时间配置
+java堆栈对比 
+数据库缓存一致方法
+分布式锁实现方式
+拦截器和过滤器对比
+redis数据结构  为什么用hash结构
+jdk cglib动态代理对比
+分布式事务
+mq作用
+千万级sql同时插入如何实现
+如果从页面上传超过2g文件
+线程池线程数调优
+jdk几种线程池
+ThreadPoolExecutor提交线程的方式  future和futuretask区别  线程几种实现方式
+分布式定时任务
+netty优点 
+jvm调优
+mongodb分片机制
+web应用高并发下的优化
+自动装箱 如Integeri1,i2=128 ==进行比较
+如何实现spring自定义注解
+spring bean构造方式 注入方式 生命周期  如何配置多例
+spring 事务原理 传播机制 异步事务
+http 1.0  1.1对比
+jdk1.8新特性
+多线程并发包原理
+mysql半复制
+redis memcached对比
+mybatis hibernate对比  一级二级缓存
+hashmap原理  concurrenthashmap原理
+举例死锁
+cpu100%如何分析原因
+获取applicationcontext几种方法
+mysql索引原理  优化方法
+redis缓存失效算法 哨兵配置方法
+
+
+
